@@ -16,5 +16,8 @@ clean:
 	-rm mastermind-test
 	sudo rmmod mastermind
 
+run:
+	./mastermind-test
+
 load:
 	sudo insmod mastermind.ko
