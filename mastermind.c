@@ -104,11 +104,42 @@ static ssize_t mm_write(struct file *filp, const char __user * ubuf,
 			size_t count, loff_t * ppos)
 {
 	int retval;
+	int guess[NUM_PEGS];
+	int checked[NUM_PEGS];
+	int i, j, bl_peg, wh_peg;
 	char kernel_buff[80];
-	count=min(count, sizeof(kernel_buff));
 	retval=copy_from_user(kernel_buff, ubuf, count);
 	if(retval<0)
 		return -EINVAL;
+	for(i=0;i<NUM_PEGS;i++)
+		checked[i]=-1;
+	for(i=0;i<NUM_PEGS;i++)
+		if(kernel_buff[i]>='0'&&kernel_buff[i]<='5')
+			guess[i]=(int)(kernel_buff[i]-'0');
+		else
+			return -EPERM;
+
+	bl_peg=0; wh_peg=0;
+	for(i=0;i<NUM_PEGS;i++)
+		if(guess[i]==target_code[i])
+			checked[i]=1;
+	for(i=0;i<NUM_PEGS;i++){
+		if(checked[i]!=1)
+			for(j=0;j<NUM_PEGS;j++)
+				if(checked[j]!=1&&guess[i]==target_code[j])
+					checked[j]=0;
+	}
+	for(i=0;i<NUM_PEGS;i++)
+		if(checked[i]==1)
+			bl_peg++;
+		else if(checked[i]==0)
+			wh_peg++;
+
+
+	num_guesses++;
+	for(i=0;i<sizeof(game_status);i++)
+		game_status[i]='\0';
+	scnprintf(game_status, sizeof(game_status), "Guess %u :%c%c%c%c %i black peg(s), %i white peg(s)\n", num_guesses, kernel_buff[0], kernel_buff[1], kernel_buff[2], kernel_buff[3], bl_peg, wh_peg);
 	/* FIXME */
 	return count;
 }
@@ -191,8 +222,6 @@ static ssize_t mm_ctl_write(struct file *filp, const char __user * ubuf,
 		scnprintf(game_status, sizeof(game_status), "Game over. The code was     \n");
 		for(i=0;i<4;i++)
 			game_status[24+i]=(char)(target_code[i]+'0');
-		
-			
 	}
 	else
 		return -EPERM;
