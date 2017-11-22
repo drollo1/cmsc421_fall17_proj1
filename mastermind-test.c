@@ -29,15 +29,62 @@ int main(void) {
 
 	char testbuff[80];
 	memset(testbuff, '\0', 80);
-	read(mm_fd, testbuff, 80);
-	printf("The game says: %s\n", testbuff);
+	if(read(mm_fd, testbuff, 11)==-1)
+		goto read_err;
+	printf("%s\n", testbuff);
 
-	write(mm_ctl_fd, "start", 5);
-
+	printf("User starts game\n");
+	if(write(mm_ctl_fd, "start", 5)==-1)
+		goto write_err;
 	memset(testbuff, '\0', 80);
-	read(mm_fd, testbuff, 80);
-	printf("The game says: %s\n", testbuff);
+	if(read(mm_fd, testbuff, 13)==-1)
+		goto read_err;
+	printf("mm: %s\n", testbuff);
+
+	printf("User enters 0000\n");
+	if(write(mm_fd, "0000", 4)==-1)
+		goto write_err;
+	memset(testbuff, '\0', 80);
+	if(read(mm_fd, testbuff, 40)==-1)
+		goto read_err;
+	printf("User enters 1100\n");
+	if(write(mm_fd, "1100", 4)==-1)
+		goto write_err;
+	printf("mm: %s\n", testbuff);
+	printf("User enters 0011\n");
+	if(write(mm_fd, "0011", 4)==-1)
+		goto write_err;
+	printf("User enters 001234\n");
+	if(write(mm_fd, "001234", 6)==-1)
+		goto write_err;
+
+	printf("The mem map:\n");
+	char * start = NULL;
+    start = mmap(start, PAGE_SIZE, PROT_READ, MAP_PRIVATE, mm_fd, 0);
+    printf("%.*s", (int)PAGE_SIZE, start);
+
+    printf("User quits\n");
+	if(write(mm_ctl_fd, "quit", 4)==-1)
+		goto write_err;
+	memset(testbuff, '\0', 80);
+	if(read(mm_fd, testbuff, 28)==-1)
+		goto read_err;
+	printf("mm: %s\n", testbuff);
+
+	printf("The mem map:\n");
+	start = NULL;
+    start = mmap(start, PAGE_SIZE, PROT_READ, MAP_PRIVATE, mm_fd, 0);
+    printf("%.*s", (int)PAGE_SIZE, start);
+
+	close(mm_fd);
+	close(mm_ctl_fd);
 
 	return 0;
-	
+
+	write_err:
+		printf("There was an error writing to device.\n");
+		return 1;
+	read_err:
+		printf("There was an error reading from device.\n");
+		return 1;
 }

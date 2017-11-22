@@ -52,6 +52,8 @@ static char game_status[80];
 /** buffer that logs guesses for the current game */
 static char *user_view;
 
+static int uv_pos;
+
 /**
  * mm_read() - callback invoked when a process reads from
  * /dev/mm
@@ -74,6 +76,8 @@ static ssize_t mm_read(struct file *filp, char __user * ubuf, size_t count,
 	int retval;
 	count = (count > (sizeof(game_status)-*ppos)) ? (sizeof(game_status)-*ppos) : count;
 	retval=copy_to_user(ubuf, game_status, count);
+	if(retval<0)
+		return -EINVAL;
 	*ppos+=count;
 	return count;
 	/* FIXME */
@@ -108,16 +112,18 @@ static ssize_t mm_write(struct file *filp, const char __user * ubuf,
 	int checked[NUM_PEGS];
 	int i, j, bl_peg, wh_peg;
 	char kernel_buff[80];
+	if(!game_active)
+		return -EPERM;
 	retval=copy_from_user(kernel_buff, ubuf, count);
 	if(retval<0)
 		return -EINVAL;
-	for(i=0;i<NUM_PEGS;i++)
-		checked[i]=-1;
 	for(i=0;i<NUM_PEGS;i++)
 		if(kernel_buff[i]>='0'&&kernel_buff[i]<='5')
 			guess[i]=(int)(kernel_buff[i]-'0');
 		else
 			return -EPERM;
+	for(i=0;i<NUM_PEGS;i++)
+		checked[i]=-1;
 
 	bl_peg=0; wh_peg=0;
 	for(i=0;i<NUM_PEGS;i++)
@@ -135,11 +141,11 @@ static ssize_t mm_write(struct file *filp, const char __user * ubuf,
 		else if(checked[i]==0)
 			wh_peg++;
 
-
 	num_guesses++;
 	for(i=0;i<sizeof(game_status);i++)
 		game_status[i]='\0';
-	scnprintf(game_status, sizeof(game_status), "Guess %u :%c%c%c%c %i black peg(s), %i white peg(s)\n", num_guesses, kernel_buff[0], kernel_buff[1], kernel_buff[2], kernel_buff[3], bl_peg, wh_peg);
+	uv_pos+=scnprintf(user_view+uv_pos, PAGE_SIZE-uv_pos, "Guess %u: %c%c%c%c \t| B%i W%i\n", num_guesses, kernel_buff[0], kernel_buff[1], kernel_buff[2], kernel_buff[3], bl_peg, wh_peg);
+	scnprintf(game_status, sizeof(game_status), "Guess %u : %i black peg(s), %i white peg(s)\n", num_guesses, bl_peg, wh_peg);
 	/* FIXME */
 	return count;
 }
@@ -208,6 +214,7 @@ static ssize_t mm_ctl_write(struct file *filp, const char __user * ubuf,
 		target_code[2]=1;
 		target_code[3]=2;
 		num_guesses=0;
+		uv_pos=0;
 		for(i=0;i<PAGE_SIZE;i++)
 			user_view[i]='\0';
 		game_active=true;
@@ -222,6 +229,7 @@ static ssize_t mm_ctl_write(struct file *filp, const char __user * ubuf,
 		scnprintf(game_status, sizeof(game_status), "Game over. The code was     \n");
 		for(i=0;i<4;i++)
 			game_status[24+i]=(char)(target_code[i]+'0');
+		user_view[0]='\0';
 	}
 	else
 		return -EPERM;
@@ -289,6 +297,7 @@ static int __init mastermind_init(void)
 		misc_deregister(&mm_dev);
 	DEV_ERROR:
 		pr_err("Could not connect to devices");
+		vfree(user_view);
 		return -ENODEV;
 }
 
