@@ -3,10 +3,10 @@
 //Author Name: Dominic Rollo
 //Assignment: project 1
 //
-//Description: User is given a menu that allows them to spawn
-//	child processes, kill them, and exit the program.
+//Description: Kernel code that manages read and writingfor
+//              the random devices /dev/mm and /dev/mm_ctl.
 //
-//**************Outside Help*********************************
+//**********************************************************
 
 /*
  * This file uses kernel-doc style comments, which is similar to
@@ -74,11 +74,14 @@ static ssize_t mm_read(struct file *filp, char __user * ubuf, size_t count,
 		       loff_t * ppos)
 {
 	int retval;
-	count = (count > (sizeof(game_status)-*ppos)) ? (sizeof(game_status)-*ppos) : count;
-	retval=copy_to_user(ubuf, game_status, count);
-	if(retval<0)
+	count =
+	    (count >
+	     (sizeof(game_status) - *ppos)) ? (sizeof(game_status) -
+					       *ppos) : count;
+	retval = copy_to_user(ubuf, game_status, count);
+	if (retval < 0)
 		return -EINVAL;
-	*ppos+=count;
+	*ppos += count;
 	return count;
 	/* FIXME */
 	return -EPERM;
@@ -112,40 +115,47 @@ static ssize_t mm_write(struct file *filp, const char __user * ubuf,
 	int checked[NUM_PEGS];
 	int i, j, bl_peg, wh_peg;
 	char kernel_buff[80];
-	if(!game_active)
+	if (!game_active)
 		return -EPERM;
-	retval=copy_from_user(kernel_buff, ubuf, count);
-	if(retval<0)
+	retval = copy_from_user(kernel_buff, ubuf, count);
+	if (retval < 0)
 		return -EINVAL;
-	for(i=0;i<NUM_PEGS;i++)
-		if(kernel_buff[i]>='0'&&kernel_buff[i]<='5')
-			guess[i]=(int)(kernel_buff[i]-'0');
+	for (i = 0; i < NUM_PEGS; i++)
+		if (kernel_buff[i] >= '0' && kernel_buff[i] <= '5')
+			guess[i] = (kernel_buff[i] - '0');
 		else
 			return -EPERM;
-	for(i=0;i<NUM_PEGS;i++)
-		checked[i]=-1;
+	for (i = 0; i < NUM_PEGS; i++)
+		checked[i] = -1;
 
-	bl_peg=0; wh_peg=0;
-	for(i=0;i<NUM_PEGS;i++)
-		if(guess[i]==target_code[i])
-			checked[i]=1;
-	for(i=0;i<NUM_PEGS;i++){
-		if(checked[i]!=1)
-			for(j=0;j<NUM_PEGS;j++)
-				if(checked[j]!=1&&guess[i]==target_code[j])
-					checked[j]=0;
+	bl_peg = 0;
+	wh_peg = 0;
+	for (i = 0; i < NUM_PEGS; i++)
+		if (guess[i] == target_code[i])
+			checked[i] = 1;
+	for (i = 0; i < NUM_PEGS; i++) {
+		if (checked[i] != 1)
+			for (j = 0; j < NUM_PEGS; j++)
+				if (checked[j] != 1
+				    && guess[i] == target_code[j])
+					checked[j] = 0;
 	}
-	for(i=0;i<NUM_PEGS;i++)
-		if(checked[i]==1)
+	for (i = 0; i < NUM_PEGS; i++)
+		if (checked[i] == 1)
 			bl_peg++;
-		else if(checked[i]==0)
+		else if (checked[i] == 0)
 			wh_peg++;
 
 	num_guesses++;
-	for(i=0;i<sizeof(game_status);i++)
-		game_status[i]='\0';
-	uv_pos+=scnprintf(user_view+uv_pos, PAGE_SIZE-uv_pos, "Guess %u: %c%c%c%c \t| B%i W%i\n", num_guesses, kernel_buff[0], kernel_buff[1], kernel_buff[2], kernel_buff[3], bl_peg, wh_peg);
-	scnprintf(game_status, sizeof(game_status), "Guess %u : %i black peg(s), %i white peg(s)\n", num_guesses, bl_peg, wh_peg);
+	for (i = 0; i < sizeof(game_status); i++)
+		game_status[i] = '\0';
+	uv_pos +=
+	    scnprintf(user_view + uv_pos, PAGE_SIZE - uv_pos, "%c%c%c%c%i%i",
+		      kernel_buff[0], kernel_buff[1], kernel_buff[2],
+		      kernel_buff[3], bl_peg, wh_peg);
+	scnprintf(game_status, sizeof(game_status),
+		  "Guess %u: %i black peg(s), %i white peg(s)\n", num_guesses,
+		  bl_peg, wh_peg);
 	/* FIXME */
 	return count;
 }
@@ -207,31 +217,32 @@ static ssize_t mm_ctl_write(struct file *filp, const char __user * ubuf,
 	int retval;
 	char kernel_buff[80];
 	int i;
-	retval=copy_from_user(kernel_buff, ubuf, count);
-	if((count==5)&&(kernel_buff[0]=='s')&&(kernel_buff[1]=='t')&&(kernel_buff[2]=='a')&&(kernel_buff[3]=='r')&&(kernel_buff[4]=='t')){
-		target_code[0]=0;
-		target_code[1]=0;
-		target_code[2]=1;
-		target_code[3]=2;
-		num_guesses=0;
-		uv_pos=0;
-		for(i=0;i<PAGE_SIZE;i++)
-			user_view[i]='\0';
-		game_active=true;
-		for(i=0;i<sizeof(game_status);i++)
-			game_status[i]='\0';
+	retval = copy_from_user(kernel_buff, ubuf, count);
+	if ((count == 5) && (kernel_buff[0] == 's') && (kernel_buff[1] == 't')
+	    && (kernel_buff[2] == 'a') && (kernel_buff[3] == 'r')
+	    && (kernel_buff[4] == 't')) {
+		target_code[0] = 0;
+		target_code[1] = 0;
+		target_code[2] = 1;
+		target_code[3] = 2;
+		num_guesses = 0;
+		uv_pos = 0;
+		for (i = 0; i < PAGE_SIZE; i++)
+			user_view[i] = '\0';
+		game_active = true;
+		for (i = 0; i < sizeof(game_status); i++)
+			game_status[i] = '\0';
 		scnprintf(game_status, sizeof(game_status), "Starting game\n");
-	}
-	else if(count==4&&kernel_buff[0]=='q'&&kernel_buff[1]=='u'&&kernel_buff[2]=='i'&&kernel_buff[3]=='t'){
-		game_active=false;
-		for(i=0;i<sizeof(game_status);i++)
-			game_status[i]='\0';
-		scnprintf(game_status, sizeof(game_status), "Game over. The code was     \n");
-		for(i=0;i<4;i++)
-			game_status[24+i]=(char)(target_code[i]+'0');
-		user_view[0]='\0';
-	}
-	else
+	} else if (count == 4 && kernel_buff[0] == 'q' && kernel_buff[1] == 'u'
+		   && kernel_buff[2] == 'i' && kernel_buff[3] == 't') {
+		game_active = false;
+		for (i = 0; i < sizeof(game_status); i++)
+			game_status[i] = '\0';
+		scnprintf(game_status, sizeof(game_status),
+			  "Game over. The code was     .\n");
+		for (i = 0; i < 4; i++)
+			game_status[24 + i] = (char)(target_code[i] + '0');
+	} else
 		return -EPERM;
 	/* FIXME */
 	return count;
@@ -239,28 +250,28 @@ static ssize_t mm_ctl_write(struct file *filp, const char __user * ubuf,
 	return -EPERM;
 }
 
-static const struct file_operations mm_ctl_fops={
-	.write	= mm_ctl_write,
+static const struct file_operations mm_ctl_fops = {
+	.write = mm_ctl_write,
 };
 
-static struct miscdevice mm_ctl_dev={
-	.minor 	= MISC_DYNAMIC_MINOR,
-	.name 	= "mm_ctl",
-	.fops 	= &mm_ctl_fops,
-	.mode 	= 0666,
+static struct miscdevice mm_ctl_dev = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "mm_ctl",
+	.fops = &mm_ctl_fops,
+	.mode = 0666,
 };
 
-static const struct file_operations mm_fops={
-	.read	= mm_read,
-	.write	= mm_write,
-	.mmap	= mm_mmap,
+static const struct file_operations mm_fops = {
+	.read = mm_read,
+	.write = mm_write,
+	.mmap = mm_mmap,
 };
 
-static struct miscdevice mm_dev={
-	.minor 	= MISC_DYNAMIC_MINOR,
-	.name 	= "mm",
-	.fops 	= &mm_fops,
-	.mode 	= 0666,
+static struct miscdevice mm_dev = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "mm",
+	.fops = &mm_fops,
+	.mode = 0666,
 };
 
 /**
@@ -277,28 +288,28 @@ static int __init mastermind_init(void)
 		return -ENOMEM;
 	}
 
-	if(misc_register(&mm_dev))
+	if (misc_register(&mm_dev))
 		goto DEV_ERROR;
-	if(misc_register(&mm_ctl_dev))
+	if (misc_register(&mm_ctl_dev))
 		goto CTL_DEV_ERROR;
 
-	for(j=0;j<sizeof(game_status);j++)
-		game_status[j]='\0';
+	for (j = 0; j < sizeof(game_status); j++)
+		game_status[j] = '\0';
 
 	scnprintf(game_status, sizeof(game_status), "No game yet\n");
 
-	game_active=false;
+	game_active = false;
 
 	/* YOUR CODE HERE */
 
 	return 0;
 
-	CTL_DEV_ERROR:
-		misc_deregister(&mm_dev);
-	DEV_ERROR:
-		pr_err("Could not connect to devices");
-		vfree(user_view);
-		return -ENODEV;
+CTL_DEV_ERROR:
+	misc_deregister(&mm_dev);
+DEV_ERROR:
+	pr_err("Could not connect to devices");
+	vfree(user_view);
+	return -ENODEV;
 }
 
 /**
