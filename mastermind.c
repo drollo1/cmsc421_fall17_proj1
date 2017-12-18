@@ -78,7 +78,7 @@ static ssize_t mm_read(struct file *filp, char __user * ubuf, size_t count,
 	    (count >
 	     (sizeof(game_status) - *ppos)) ? (sizeof(game_status) -
 					       *ppos) : count;
-	retval = copy_to_user(ubuf, game_status, count);
+	retval = copy_to_user(ubuf, game_status+*ppos, count);
 	if (retval < 0)
 		return -EINVAL;
 	*ppos += count;
